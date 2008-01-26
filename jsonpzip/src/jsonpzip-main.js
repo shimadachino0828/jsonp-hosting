@@ -25,7 +25,7 @@
 * ================================================================ */
 
 JsonpZip = {};
-JsonpZip.URL = 'http://192.168.1.150/jsonpzip/';
+JsonpZip.URL = 'http://192.168.1.150/svn/trunk/jsonpzip/';
 JsonpZip.VERSION = '0.01';
 JsonpZip.common = function () {};
 
@@ -237,14 +237,14 @@ JsonpZip.addr2zip.jsonp_url = function ( idx ) {
 	adr3 = adr3.replace( /%/g, "" );
 	adr2 = adr2.replace( /%/g, "" );
 	var url = JsonpZip.URL;
-	url += 'addr2zip/jsonp/'+adr3+'/'+adr2+'.jsonp';
+	url += 'addr2zip/'+adr3+'/'+adr2+'.jsonp';
 	return url;
 };
 JsonpZip.zip2addr.jsonp_url = function ( idx ) {
 	var zip2 = idx.substr( 0, 2 );
 	var zip5 = idx.substr( 0, 5 );
 	var url = JsonpZip.URL;
-	url += 'zip2addr/jsonp/'+zip2+'/'+zip5+'.jsonp';
+	url += 'zip2addr/'+zip2+'/'+zip5+'.jsonp';
 	return url;
 };
 
