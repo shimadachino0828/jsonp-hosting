@@ -1,0 +1,57 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>
+JsonpZIP
+</title>
+<script type="text/javascript" src="../src/jsonpzip-main.js" charset="UTF-8"></script>
+</head>
+<body>
+
+<h3>パターン１</h3>
+
+<form>
+<input type="text" name="zip3" rel="jsonpzip[zip3]" maxlength="3" size="4">
+-
+<input type="text" name="zip4" rel="jsonpzip[zip4]" maxlength="4" size="5"><br>
+<select name="pref" rel="jsonpzip[pref]"><option value="">↓&nbsp;&nbsp;&nbsp;&nbsp;</option></select>
+<input type="text" name="city" rel="jsonpzip[city]" size="20">
+<input type="text" name="area" rel="jsonpzip[area]" size="20"><br>
+<input type="text" name="strt" rel="jsonpzip[strt]" size="40">
+</form>
+
+<h3>パターン２</h3>
+
+<form name="hoge">
+<input type="text" name="zip3" rel="jsonpzip[zip3]" maxlength="3" size="4">
+-
+<input type="text" name="zip4" rel="jsonpzip[zip4]" maxlength="4" size="5"><br>
+<select name="pref" rel="jsonpzip[pref]"><option value="">↓&nbsp;&nbsp;&nbsp;&nbsp;</option></select>
+<select name="city" rel="jsonpzip[city]"><option value="">↓&nbsp;&nbsp;&nbsp;&nbsp;</option></select>
+<select name="area" rel="jsonpzip[area]"><option value="">↓&nbsp;&nbsp;&nbsp;&nbsp;</option></select><br>
+<input type="text" name="strt" rel="jsonpzip[strt]" size="40">
+</form>
+
+<h3>パターン３</h3>
+
+<form>
+<input type="text" name="zip3" rel="jsonpzip[zip3]" maxlength="3" size="4">
+-
+<input type="text" name="zip4" rel="jsonpzip[zip4]" maxlength="4" size="5"><br>
+
+<select name="pref" rel="jsonpzip[pref]"><option value="">↓&nbsp;&nbsp;&nbsp;&nbsp;</option></select>
+
+<input type="text" name="addr" rel="jsonpzip[addr]" size="40">
+</form>
+
+<h3>パターン４</h3>
+
+<form>
+<input type="text" name="zip3" rel="jsonpzip[zip7]" maxlength="8" size="9"><br>
+<input type="text" name="addr" rel="jsonpzip[addr]" size="40">
+</form>
+
+bbb
+
+</body>
+</html>
