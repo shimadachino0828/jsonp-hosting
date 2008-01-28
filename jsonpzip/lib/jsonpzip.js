@@ -25,7 +25,6 @@
 * ================================================================ */
 
 JsonpZip = {};
-JsonpZip.URL = 'http://192.168.1.150/svn/trunk/jsonpzip/jsonp/';
 JsonpZip.URL = 'http://jsonp-hosting.googlecode.com/svn/trunk/jsonpzip/jsonp/';
 JsonpZip.VERSION = '0.01';
 JsonpZip.common = function () {};
