@@ -24,9 +24,10 @@
     OTHER DEALINGS IN THE SOFTWARE.
 * ================================================================ */
 
-JsonpZip = {};
-JsonpZip.URL = 'http://192.168.1.150/svn/trunk/jsonpzip/jsonp/';
-JsonpZip.URL = 'http://jsonp-hosting.googlecode.com/svn/trunk/jsonpzip/jsonp/';
+if ( typeof(JsonpZip) == 'undefined' ) JsonpZip = {};
+if ( typeof(JsonpZip.JSONP_BASE) == 'undefined' ) {
+	JsonpZip.JSONP_BASE = 'http://jsonp-hosting.googlecode.com/svn/trunk/jsonpzip/jsonp/';
+}
 JsonpZip.VERSION = '0.01';
 JsonpZip.common = function () {};
 
@@ -240,8 +241,8 @@ JsonpZip.zip2addr.get_class = function () { return 'zip2addr'; }
 JsonpZip.master.jsonp_url = function ( idx ) {
 	if ( ! idx ) return;
 	if ( idx == "" ) return;
-	var url = JsonpZip.URL;
-	url += 'master/'+idx+'.jsonp';
+	var url = JsonpZip.JSONP_BASE;
+	url += 'jsonp/master/'+idx+'.jsonp';
 	return url;
 };
 JsonpZip.addr2zip.jsonp_url = function ( citycd ) {
@@ -249,16 +250,16 @@ JsonpZip.addr2zip.jsonp_url = function ( citycd ) {
 	var prefcd = idx.substr( 0, 2 );
 	if ( ! idx ) return;
 	if ( idx == "" ) return;
-	var url = JsonpZip.URL;
-	url += 'city/pref-'+prefcd+'/city-'+idx+'.jsonp';
+	var url = JsonpZip.JSONP_BASE;
+	url += 'jsonp/city/pref-'+prefcd+'/city-'+idx+'.jsonp';
 	return url;
 };
 JsonpZip.zip2addr.jsonp_url = function ( zip7 ) {
 	var idx = this.index_key( zip7 );
 	if ( ! idx ) return;
 	if ( idx == "" ) return;
-	var url = JsonpZip.URL;
-	url += 'zip/zip-'+idx+'.jsonp';
+	var url = JsonpZip.JSONP_BASE;
+	url += 'jsonp/zip/zip-'+idx+'.jsonp';
 	return url;
 };
 
