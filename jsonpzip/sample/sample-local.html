@@ -1,0 +1,67 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>
+JsonpZip サンプルフォーム（仮）
+</title>
+<script type="text/javascript" src="../src/jsonpzip-load.js" charset="UTF-8"></script>
+</head>
+<body>
+
+JsonpZip サンプルフォーム（仮）
+<hr>
+
+<h3>パターン１（都道府県・市区町村・大字町域がプルダウン）</h3>
+
+<form name="pat1">
+郵便番号：
+<input type="text" name="zip3" rel="jsonpzip[zip3]" maxlength="3" size="4">
+-
+<input type="text" name="zip4" rel="jsonpzip[zip4]" maxlength="4" size="5"><br>
+住所：
+<select name="pref" rel="jsonpzip[pref]"><option value="">↓&nbsp;&nbsp;&nbsp;&nbsp;</option></select>
+<select name="city" rel="jsonpzip[city]"><option value="">↓&nbsp;&nbsp;&nbsp;&nbsp;</option></select>
+<select name="area" rel="jsonpzip[area]"><option value="">↓&nbsp;&nbsp;&nbsp;&nbsp;</option></select><br>
+番地～号室：
+<input type="text" name="strt" rel="jsonpzip[strt]" size="60">
+</form>
+
+<h3>パターン２（都道府県・市区町村・大字町域がテキスト）</h3>
+
+<form name="pat2">
+郵便番号：
+<input type="text" name="zip3" rel="jsonpzip[zip3]" maxlength="3" size="4">
+-
+<input type="text" name="zip4" rel="jsonpzip[zip4]" maxlength="4" size="5"><br>
+住所：
+<select name="pref" rel="jsonpzip[pref]"><option value="">↓&nbsp;&nbsp;&nbsp;&nbsp;</option></select>
+<input type="text" name="city" rel="jsonpzip[city]" size="20">
+<input type="text" name="area" rel="jsonpzip[area]" size="20"><br>
+番地～号室：
+<input type="text" name="strt" rel="jsonpzip[strt]" size="60">
+</form>
+
+<h3>パターン３（都道府県がプルダウン＋市区町村以下が１枠）</h3>
+
+<form name="pat3">
+郵便番号：
+<input type="text" name="zip3" rel="jsonpzip[zip3]" maxlength="3" size="4">
+-
+<input type="text" name="zip4" rel="jsonpzip[zip4]" maxlength="4" size="5"><br>
+住所：
+<select name="pref" rel="jsonpzip[pref]"><option value="">↓&nbsp;&nbsp;&nbsp;&nbsp;</option></select>
+<input type="text" name="addr" rel="jsonpzip[addr]" size="60">
+</form>
+
+<h3>パターン４（もっともシンプル）</h3>
+
+<form name="pat4">
+郵便番号：
+<input type="text" name="zip3" rel="jsonpzip[zip7]" maxlength="8" size="9"><br>
+住所：
+<input type="text" name="addr" rel="jsonpzip[addr]" size="60">
+</form>
+
+
+</body>
+</html>
