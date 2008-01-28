@@ -851,12 +851,10 @@ new function () {
 
 
 
+	/*
 	var init = function () {
 		var chain = function ( ret ) { alert( ret ) };
-
 		JsonpZip.master.get_prefcd_by_addr( chain, '東京都' );
-
-	/*
 		JsonpZip.master.get_citycd_by_addr(  chain, "北海道空知郡上富良野町" );
 		JsonpZip.master.get_pref_by_prefcd( chain, 13 );
 		JsonpZip.master.get_city_by_citycd( chain, "01460" );
@@ -867,7 +865,6 @@ new function () {
 		JsonpZip.addr2zip.get_ziplist_by_addr( chain, "東京都大田区白金台" );
 		JsonpZip.addr2zip.get_ziplist_by_addr( chain, "東京都大田区白金" );
 		JsonpZip.addr2zip.get_ziplist_by_addr( chain, "東京都大田区仲池上１丁目" );
-	*/
-
 	};
 	setTimeout( init, 1 );
+	*/
