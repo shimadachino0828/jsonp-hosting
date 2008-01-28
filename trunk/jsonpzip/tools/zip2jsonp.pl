@@ -1,34 +1,31 @@
 #!/usr/bin/perl
 # ---------------------------------------------------------------- #
-#   郵便番号一覧 CSV ファイルを JSONP ファイルに変換
-#   (c) 2001-2007 Kawasaki Yusuke. All rights reserved.
+#   郵便番号一覧 CSV ファイルを JSONP ファイルを生成する
+#   (c) 2001-2008 Kawasaki Yusuke. All rights reserved.
 # ---------------------------------------------------------------- #
     use strict;
-    require 5.008;                  #
+    require 5.008;
     use utf8;
-    use Encode;                     # 文字コード変換モジュール弾
+    use Encode ();
     use Storable ();
     use URI::Escape qw( uri_escape_utf8 );
     use lib qw( lib );
-    use Time::Local;
-#   use JSON;                       # 
-    use JSON::Syck;                 # 
+    use Time::Local ();
+#   use JSON;
+    use JSON::Syck;
 # ---------------------------------------------------------------- #
     my $CSV_ENC   = 'CP932';        # CSVファイルのエンコーディング
     my $DISP_ENC  = 'utf8';         # 表示用のエンコーディング
     my $JSON_ENC  = 'utf8';         # JSONファイルのエンコーディング
     my $CSV_FILE  = 'ken_all.csv';  # 入力元CSVファイル名（デフォルト）
     my $CSV_JIGYO = 'jigyosyo.csv'; # 事業所要郵便番号CSVファイル（オプション）
-#   my $ZIP2ADDR_JSON   = '../zip2addr/json/%s/%s.json';
-#   my $ADDR2ZIP_JSON   = '../addr2zip/json/%s/%s.json';
-#   my $MASTER_JSON     = '../master/%s.json';
-    my $ZIP2ADDR_JSONP  = '../zip2addr/jsonp/%s/%s.jsonp';
-    my $ADDR2ZIP_JSONP  = '../addr2zip/jsonp/%s/%s.jsonp';
-    my $MASTER_JSONP    = '../master/%s.jsonp';
+    my $ZIP2ADDR_JSONP  = '../jsonp/zip/zip-%03d.jsonp';
+    my $ADDR2ZIP_JSONP  = '../jsonp/city/pref-%02d/city-%05d.jsonp';
+    my $MASTER_JSONP    = '../jsonp/master/%s.jsonp';
     my $ZIP2ADDR_PREFIX = 'JsonpZip.zip2addr.callback';
     my $ADDR2ZIP_PREFIX = 'JsonpZip.addr2zip.callback';
     my $MASTER_PREFIX   = 'JsonpZip.master.callback';
-    my $TOOL_VERSION    = '1.0';
+    my $TOOL_VERSION    = '1.1';
     my $DIRMOD = 0755;
 # ---------------------------------------------------------------- #
     &main( @ARGV );
@@ -38,10 +35,10 @@ sub main {
     my $jigcsv = shift || $CSV_JIGYO;
     my $kenlist = &parse_ken_all( $kencsv );
     my $jiglist = &parse_jigyosyo( $jigcsv );
-#	&write_preflist( $kenlist );
-#    &write_citylist( $kenlist );
-     &write_zip2addr( $kenlist, $jiglist );
-#   &write_addr2zip( $kenlist );
+#   &write_preflist( $kenlist );
+#   &write_citylist( $kenlist );
+#   &write_zip2addr( $kenlist, $jiglist );
+    &write_addr2zip( $kenlist );
 }
 # ---------------------------------------------------------------- #
 # 読み仮名データの促音・拗音を小書きで表記したもの
@@ -185,8 +182,8 @@ sub parse_jigyosyo {
 sub write_zip2addr {
     my $kenlist = shift or return;
     my $jiglist = shift || [];
-    my $out   = {};
     my $check = {};
+    my $work  = {};
 
     print STDERR "**** zip2addr ****\n";
 
@@ -194,7 +191,7 @@ sub write_zip2addr {
 
     my $e = 0;
     foreach my $line ( @$kenlist ) {
-        my( $citid, undef, $zip7, undef, undef, undef, $pref, $city, $area ) = @$line;
+        my( $citcd, undef, $zip7, undef, undef, undef, $pref, $city, $area ) = @$line;
 
         #『西新宿新宿アイランドタワー（１階）』等のレコードは、階番号を生かす
         $area =~ s/（((０|１|２|３|４|５|６|７|８|９)+階)）$/$1/;
@@ -204,14 +201,14 @@ sub write_zip2addr {
 
         # 『（』がないのに『、』か『）』が入る大字を無視
         $area = "" if ( $area =~ /[、）]/ );
+        next if $check->{$citcd.$area.$zip7} ++;
+        
+        my $zip3 = ( $zip7 =~ /^(\d{3})/ )[0];
+        $work->{$zip3} ||= {};
+        $work->{$zip3}->{$citcd} ||= [ $citcd, $pref, $city, [] ];
 
-        next if $check->{$citid.$area.$zip7} ++;
-        my( $zip5, $zip2 ) = ( $zip7 =~ /^((\d{2})\d{3})/ );
-        my $array = [ $zip7, $pref, $city, $area ];
-
-        $out->{$zip2} ||= {};
-        $out->{$zip2}->{$zip5} ||= [];
-        push( @{$out->{$zip2}->{$zip5}}, $array );
+        my $array = [ $zip7, $area ];
+        push( @{$work->{$zip3}->{$citcd}->[3]}, $array );
         print STDERR "." if ( $e ++ % 2000 == 0 );
     }
     print STDERR " $e areas\n" if ( $e > 0 );
@@ -220,16 +217,26 @@ sub write_zip2addr {
 
     my $d = 0;
     foreach my $line ( @$jiglist ) {
-        my( $citid, undef, undef, $pref, $city, $area, $strt, $zip7 ) = @$line;
-        next if $check->{$citid.$area.$strt.$zip7} ++;
-        my( $zip5, $zip2 ) = ( $zip7 =~ /^((\d{2})\d{3})/ );
-        my $array = [ $zip7, $pref, $city, $area, $strt ];
-        $out->{$zip2} ||= {};
-        $out->{$zip2}->{$zip5} ||= [];
-        push( @{$out->{$zip2}->{$zip5}}, $array );
+        my( $citcd, undef, undef, $pref, $city, $area, $strt, $zip7 ) = @$line;
+        next if $check->{$citcd.$area.$strt.$zip7} ++;
+        my $zip3 = ( $zip7 =~ /^(\d{3})/ )[0];
+        $work->{$zip3} ||= {};
+        $work->{$zip3}->{$citcd} ||= [ $citcd, $pref, $city, [] ];
+
+        my $array = [ $zip7, $area, $strt ];
+        push( @{$work->{$zip3}->{$citcd}->[3]}, $array );
         print STDERR "." if ( $d ++ % 2000 == 0 );
     }
     print STDERR " $d spots\n" if ( $d > 0 );
+
+    # 構造変換
+
+    my $out   = {};
+    my $FIX = 'FIX';
+    foreach my $zip3 ( keys %$work ) {
+        $out->{$FIX} ||= {};
+        $out->{$FIX}->{$zip3} = [ values %{$work->{$zip3}} ];
+	}
 
     # JSON.pm と JSON::Syck を確認する
 
@@ -239,33 +246,24 @@ sub write_zip2addr {
     print STDERR "module: \tJSON.pm ($use_json)\n" if $use_json;
     print STDERR "module: \tJSON::Syck ($use_syck)\n" if $use_syck;
 
-#   my $update = &epoch_to_w3cdtf();
-
-    # 郵便番号上位2+2桁ごとにJSONファイルに書き出していく
+    # 郵便番号上位3桁ごとにJSONファイルに書き出していく
 
     my $prev = "";
     my $c    = 0;
-    foreach my $zip2 ( sort keys %$out ) {
-        my $child = $out->{$zip2} or next;
-        my $zip1 = ( $zip2 =~ /^(\d)/ )[0];
-
-        foreach my $zip5 ( sort keys %$child ) {
-            my $data = $child->{$zip5} or next;
+    foreach my $level1 ( sort keys %$out ) {
+        my $child = $out->{$level1} or next;
+        foreach my $level2 ( sort keys %$child ) {
+            my $data = $child->{$level2} or next;
             my $dump = $use_syck ? JSON::Syck::Dump($data) :
                        $new_json ? to_json($data) : objToJson($data);
             $dump = Encode::encode( $JSON_ENC, $dump ) if $new_json;
 
-#           # JSONファイルに書き出す
-#           my $jsonfile = sprintf( $ZIP2ADDR_JSON, $zip2, $zip5 );
-#           print STDERR "json:   \t$jsonfile\n" unless $c;
-#           &check_mkdir( $jsonfile );
-#           &write_file( $jsonfile, $dump );
-
             # JSONPファイルに書き出す
-            my $jsonpfile = sprintf( $ZIP2ADDR_JSONP, $zip2, $zip5 );
+            my $jsonpfile = sprintf( $ZIP2ADDR_JSONP, $level2 );
             print STDERR "jsonp:  \t$jsonpfile\n" unless $c;
             &check_mkdir( $jsonpfile );
-            my $script = "$ZIP2ADDR_PREFIX({index:'$zip5',ver:'$TOOL_VERSION',data:\n$dump\n});\n";
+            my $index = Encode::encode( $JSON_ENC, $level2 );
+            my $script = "$ZIP2ADDR_PREFIX({index:'$index',ver:'$TOOL_VERSION',data:\n$dump\n});\n";
             &write_file( $jsonpfile, $script );
 
             print STDERR "." if ( $c ++ % 200 == 0 );
@@ -277,16 +275,15 @@ sub write_zip2addr {
 sub write_addr2zip {
     my $kenlist = shift or return;
     my $jiglist = shift || [];
-    my $out   = {};
-    my $harea = {};
-    my $hcity = {};
     my $check = {};
 
     print STDERR "**** addr2zip ****\n";
 
     my $e = 0;
+    my $work  = {};
+    my $harea = {};
     foreach my $line ( @$kenlist ) {
-        my( $citid, undef, $zip7, undef, undef, undef, $pref, $city, $area ) = @$line;
+        my( $citcd, undef, $zip7, undef, undef, undef, $pref, $city, $area ) = @$line;
         # 大字が undef（以下に掲載がない場合、番地が来る場合、一円）なら諦める
         next unless defined $area;
         #『西新宿新宿アイランドタワー（地階・階層不明）』等のレコードは無視
@@ -295,39 +292,38 @@ sub write_addr2zip {
         $area =~ s/（.*$//s;
         # 『、』か『）』が入るレコードも無視
         next if ( $area =~ /[、）]/ );
-        # 京都市は大字数が多いので、京都市と京都市以外の京都府を分離
-        my $join = join( "", $pref, $city );
-        $join =~ s/^京都府京都市/京都市/;
-        my( $adr3, $adr5 ) = ( $join =~ /^(...)(..)/ );
-        $out->{$adr3} ||= {};
-        $out->{$adr3}->{$adr5} ||= [];
+        next if $check->{$citcd.$area.$zip7} ++;
 
-        next if $check->{$citid.$area.$zip7} ++;
-        if ( ref $harea->{$citid.$area} ) {
-            push( @{$harea->{$citid.$area}}, $zip7 );
-        } else {
-            my $aarray = [ $area, $zip7 ];
-            $harea->{$citid.$area} = $aarray;
-            if ( ref $hcity->{$citid} ) {
-                push( @{$hcity->{$citid}}, $aarray );
-            } else {
-                my $carray = [ $aarray ];
-                $hcity->{$citid} = $carray;
-                my $iarray = [ $pref, $city, $carray ];
-                push( @{$out->{$adr3}->{$adr5}}, $iarray );
-            }
-        }
+        $work->{$citcd} ||= [ $citcd, $pref, $city, [] ];
+
+		if ( ! ref $harea->{$citcd.$area} ) {
+			my $aarray = [ $area, $zip7 ];
+			$harea->{$citcd.$area} = $aarray;
+			push( @{$work->{$citcd}->[3]}, $aarray );
+		} else {
+			push( @{$harea->{$citcd.$area}}, $zip7 );
+		}
         print STDERR "." if ( $e ++ % 2000 == 0 );
     }
     print STDERR " $e areas\n" if ( $e > 0 );
 
-    # 複数の住所があれば、大字が空のものを除去する
+    # 複数の住所がある市では、大字が空のものを除去する
 
-    foreach my $carray ( values %$hcity ) {
+    foreach my $barray ( values %$work ) {
+    	my $carray = $barray->[3];
         next if ( 1 == scalar @$carray );
         next unless grep { $_->[0] eq "" } @$carray;
         @$carray = grep { $_->[0] ne "" } @$carray;
     }
+
+    # 構造変換
+
+    my $out   = {};
+    foreach my $citcd ( keys %$work ) {
+    	my $prefcd = ( $citcd =~ /^(\d{2})/ )[0] or next;
+        $out->{$prefcd} ||= {};
+        $out->{$prefcd}->{$citcd} = [ $work->{$citcd} ];
+	}
 
     # JSON.pm と JSON::Syck を確認する
 
@@ -337,37 +333,23 @@ sub write_addr2zip {
     print STDERR "module: \tJSON.pm ($use_json)\n" if $use_json;
     print STDERR "module: \tJSON::Syck ($use_syck)\n" if $use_syck;
 
-#   my $update = &epoch_to_w3cdtf();
-
     # 住所の先頭５文字ごとにJSONファイルに書き出していく
 
     my $c = 0;
-    foreach my $adr3 ( sort keys %$out ) {
-        foreach my $adr5 ( sort keys %{$out->{$adr3}} ) {
-            my $data = $out->{$adr3}->{$adr5};
-            my $enc3 = uri_escape_utf8( $adr3 );
-            my $enc5 = uri_escape_utf8( $adr5 );
-            $enc3 =~ tr/A-Z/a-z/;
-            $enc5 =~ tr/A-Z/a-z/;
-            $enc3 =~ s/%//g;
-            $enc5 =~ s/%//g;
+    foreach my $level1 ( sort keys %$out ) {
+        my $child = $out->{$level1} or next;
+        foreach my $level2 ( sort keys %$child ) {
+            my $data = $child->{$level2} or next;
             my $dump = $use_syck ? JSON::Syck::Dump($data) :
                        $new_json ? to_json($data) : objToJson($data);
             $dump = Encode::encode( $JSON_ENC, $dump ) if $new_json;
 
-#           # JSONファイルに書き出す
-#           my $jsonfile = sprintf( $ADDR2ZIP_JSON, $enc3, $enc5 );
-#           print STDERR "json:   \t$jsonfile\n" unless $c;
-#           &check_mkdir( $jsonfile );
-#           &write_file( $jsonfile, $dump );
-
             # JSONPファイルに書き出す
-            my $jsonpfile = sprintf( $ADDR2ZIP_JSONP, $enc3, $enc5 );
+            my $jsonpfile = sprintf( $ADDR2ZIP_JSONP, $level1, $level2 );
             print STDERR "jsonp:  \t$jsonpfile\n" unless $c;
             &check_mkdir( $jsonpfile );
-            my $key = $adr3.$adr5;
-            $key = Encode::encode( $JSON_ENC, $key );
-            my $script = "$ADDR2ZIP_PREFIX({index:'$key',ver:'$TOOL_VERSION',data:\n$dump\n});\n";
+            my $index = Encode::encode( $JSON_ENC, $level2 );
+            my $script = "$ADDR2ZIP_PREFIX({index:'$index',ver:'$TOOL_VERSION',data:\n$dump\n});\n";
             &write_file( $jsonpfile, $script );
 
             print STDERR "." if ( $c ++ % 200 == 0 );
@@ -386,18 +368,18 @@ sub write_citylist {
 
     my $e = 0;
     foreach my $line ( @$kenlist ) {
-        my( $citid, undef, undef, undef, undef, undef, $pref, $city ) = @$line;
-        next if $hcity->{$citid} ++;
-        my $precd = int($citid/1000);
-        my $carray = [ "$citid", $city ];
+        my( $citcd, undef, undef, undef, undef, undef, $pref, $city ) = @$line;
+        next if $hcity->{$citcd} ++;
+        my $precd = int($citcd/1000);
+        my $carray = [ "$citcd", $city ];
         if ( ref $hpref->{$precd} ) {
-        	push( @{$hpref->{$precd}}, $carray );
-		} else {
-			my $varray = [ $carray ];
-			$hpref->{$precd} = $varray;
-	        my $parray = [ $precd, $pref, $varray ];
-	        push( @$data, $parray );
-	    }
+            push( @{$hpref->{$precd}}, $carray );
+        } else {
+            my $varray = [ $carray ];
+            $hpref->{$precd} = $varray;
+            my $parray = [ $precd, $pref, $varray ];
+            push( @$data, $parray );
+        }
         print STDERR "." if ( $e ++ % 200 == 0 );
     }
     print STDERR " $e areas\n" if ( $e > 0 );
@@ -413,20 +395,13 @@ sub write_citylist {
     my $dump = $use_syck ? JSON::Syck::Dump($data) :
                $new_json ? to_json($data) : objToJson($data);
     $dump = Encode::encode( $JSON_ENC, $dump ) if $new_json;
-    my $key = 'citylist';
-#   my $update = &epoch_to_w3cdtf();
-
-#   # JSONファイルに書き出す
-#   my $jsonfile = sprintf( $MASTER_JSON, $key );
-#   print STDERR "json:   \t$jsonfile\n";
-#   &check_dir( $jsonfile );
-#   &write_file( $jsonfile, $dump );
+    my $index = 'citylist';
 
     # JSONPファイルに書き出す
-    my $jsonpfile = sprintf( $MASTER_JSONP, $key );
+    my $jsonpfile = sprintf( $MASTER_JSONP, $index );
     print STDERR "jsonp:  \t$jsonpfile\n";
     &check_dir( $jsonpfile );
-    my $script = "$MASTER_PREFIX({index:'$key',ver:'$TOOL_VERSION',data:\n$dump\n});\n";
+    my $script = "$MASTER_PREFIX({index:'$index',ver:'$TOOL_VERSION',data:\n$dump\n});\n";
     &write_file( $jsonpfile, $script );
 }
 # ---------------------------------------------------------------- #
@@ -439,8 +414,8 @@ sub write_preflist {
 
     my $e = 0;
     foreach my $line ( @$kenlist ) {
-        my( $citid, undef, undef, undef, undef, undef, $pref ) = @$line;
-        my $precd = int($citid/1000);
+        my( $citcd, undef, undef, undef, undef, undef, $pref ) = @$line;
+        my $precd = int($citcd/1000);
         next if $hpref->{$precd} ++;
 #       $city =~ s/市.*区$/市/;
         my $array = [ $precd, $pref ];
@@ -461,20 +436,13 @@ sub write_preflist {
     my $dump = $use_syck ? JSON::Syck::Dump($data) :
                $new_json ? to_json($data) : objToJson($data);
     $dump = Encode::encode( $JSON_ENC, $dump ) if $new_json;
-    my $key = 'preflist';
-#   my $update = &epoch_to_w3cdtf();
-
-#   # JSONファイルに書き出す
-#   my $jsonfile = sprintf( $MASTER_JSON, $key );
-#   print STDERR "json:   \t$jsonfile\n";
-#   &check_dir( $jsonfile );
-#   &write_file( $jsonfile, $dump );
+    my $index = 'preflist';
 
     # JSONPファイルに書き出す
-    my $jsonpfile = sprintf( $MASTER_JSONP, $key );
+    my $jsonpfile = sprintf( $MASTER_JSONP, $index );
     print STDERR "jsonp:  \t$jsonpfile\n";
     &check_dir( $jsonpfile );
-    my $script = "$MASTER_PREFIX({index:'$key',ver:'$TOOL_VERSION',data:\n$dump\n});\n";
+    my $script = "$MASTER_PREFIX({index:'$index',ver:'$TOOL_VERSION',data:\n$dump\n});\n";
     &write_file( $jsonpfile, $script );
 }
 # ---------------------------------------------------------------- #
