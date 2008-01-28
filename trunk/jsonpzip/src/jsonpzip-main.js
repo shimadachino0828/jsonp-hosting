@@ -25,8 +25,8 @@
 * ================================================================ */
 
 JsonpZip = {};
-JsonpZip.URL = 'http://192.168.1.150/svn/trunk/jsonpzip/';
 JsonpZip.URL = 'http://jsonp-hosting.googlecode.com/svn/trunk/jsonpzip/';
+JsonpZip.URL = 'http://192.168.1.150/svn/trunk/jsonpzip/jsonp/';
 JsonpZip.VERSION = '0.01';
 JsonpZip.common = function () {};
 
@@ -56,7 +56,7 @@ JsonpZip.common.prototype.check_cache = function ( idx ) {
 
 //	新しい非同期タスク（キャッシュ付）を開始する
 
-JsonpZip.common.prototype.start_task = function ( chain, key ) {
+JsonpZip.common.prototype.load_run = function ( chain, key ) {
     var idx = this.index_key( key );
     var data = this.check_cache( idx );
     if ( data ) {
@@ -150,12 +150,22 @@ JsonpZip.common.prototype.grep_first = function ( list, col, test ) {
 }
 
 //	配列の特定カラムを前方一致で検索して、最初にマッチしたレコードを返す
+//	配列にある文字列の方が短い。チェック用文字列の方が長い。
 //	( grep { $_->[$col] =~ /^$test/ } @list )[0]
 
 JsonpZip.common.prototype.match_first = function ( list, col, test ) {
+	var ret;
+	var max = -1;
 	for( var i=0; i<list.length; i++ ) {
-		if ( test.indexOf(list[i][col]) == 0 ) return list[i];
+		if ( test.indexOf(list[i][col]) == 0 ) {
+			var len = list[i][col].length;
+			if ( len > max ) {
+				ret = list[i];
+				max = len;
+			}
+		}
 	}
+	return ret;
 }
 
 //	配列の各カラムに名前を振る
@@ -228,35 +238,41 @@ JsonpZip.zip2addr.get_class = function () { return 'zip2addr'; }
 /* ********************************************************* */
 
 JsonpZip.master.jsonp_url = function ( idx ) {
+	if ( ! idx ) return;
+	if ( idx == "" ) return;
 	var url = JsonpZip.URL;
 	url += 'master/'+idx+'.jsonp';
 	return url;
 };
-JsonpZip.addr2zip.jsonp_url = function ( idx ) {
-	var adr3 = encodeURIComponent(idx.substr( 0, 3 )).toLowerCase();
-	var adr2 = encodeURIComponent(idx.substr( 3, 2 )).toLowerCase();
-	adr3 = adr3.replace( /%/g, "" );
-	adr2 = adr2.replace( /%/g, "" );
+JsonpZip.addr2zip.jsonp_url = function ( citycd ) {
+	var idx = this.index_key( citycd );
+	var prefcd = idx.substr( 0, 2 );
+	if ( ! idx ) return;
+	if ( idx == "" ) return;
 	var url = JsonpZip.URL;
-	url += 'addr2zip/'+adr3+'/'+adr2+'.jsonp';
+	url += 'city/pref-'+prefcd+'/city-'+idx+'.jsonp';
 	return url;
 };
-JsonpZip.zip2addr.jsonp_url = function ( idx ) {
-	var zip2 = idx.substr( 0, 2 );
-	var zip5 = idx.substr( 0, 5 );
+JsonpZip.zip2addr.jsonp_url = function ( zip7 ) {
+	var idx = this.index_key( zip7 );
+	if ( ! idx ) return;
+	if ( idx == "" ) return;
 	var url = JsonpZip.URL;
-	url += 'zip2addr/'+zip2+'/'+zip5+'.jsonp';
+	url += 'zip/zip-'+idx+'.jsonp';
 	return url;
 };
 
 /* ********************************************************* */
 
 JsonpZip.zip2addr.index_key = function ( zip7 ) {
-	return zip7.substr( 0, 5 );
+	var idx = zip7.substr( 0, 3 );
+	idx = idx.replace( /[^A-Za-z0-9\-\%]+/g, "" );
+	return idx;
 };
-JsonpZip.addr2zip.index_key = function ( addr ) {
-	var addr = addr.replace( /^京都府京都市/, "京都市" );
-	return addr.substr( 0, 5 );
+JsonpZip.addr2zip.index_key = function ( citycd ) {
+	var idx = citycd.substr( 0, 5 );
+	idx = idx.replace( /[^A-Za-z0-9\-\%]+/g, "" );
+	return idx;
 };
 
 /* ********************************************************* */
@@ -273,7 +289,7 @@ JsonpZip.master.get_prefcd_by_addr = function ( chain, pref ) {
 		var prefcd = __this._pref2prefcd[pref];
 		return chain( prefcd );
 	};
-	this.start_task( next, idx );
+	this.load_run( next, idx );
 };
 JsonpZip.master.get_pref_by_prefcd = function ( chain, prefcd ) {
 	if ( this._prefcd2pref ) {
@@ -287,7 +303,7 @@ JsonpZip.master.get_pref_by_prefcd = function ( chain, prefcd ) {
 		var pref = __this._prefcd2pref[prefcd];
 		return chain( pref );
 	};
-	this.start_task( next, idx );
+	this.load_run( next, idx );
 };
 JsonpZip.master.get_preflist = function ( chain ) {
 	if ( this._pref_cache ) {
@@ -301,7 +317,7 @@ JsonpZip.master.get_preflist = function ( chain ) {
 		this._pref_cache = list;
 		return chain( list );
 	};
-	this.start_task( next, idx );
+	this.load_run( next, idx );
 };
 JsonpZip.master.get_citylist_by_pref = function ( chain, pref ) {
 	if ( ! this._city_cache ) this._city_cache = {};
@@ -318,20 +334,7 @@ JsonpZip.master.get_citylist_by_pref = function ( chain, pref ) {
 		var list = __this._city_cache[pref];
 		return chain( list );
 	};
-	this.start_task( next, idx );
-};
-JsonpZip.master.get_arealist_by_city = function ( chain, city ) {
-	if ( ! this._area_cache ) this._area_cache = {};
-	if ( this._area_cache[city] ) {
-		var list = this._area_cache[city];
-		return chain( list );
-	}
-	var __this = this;
-	var next = function ( list ) {
-		__this._area_cache[city] = list;
-		chain( list );
-	};
-	JsonpZip.addr2zip.get_arealist_by_addr( next, city );
+	this.load_run( next, idx );
 };
 JsonpZip.master.get_city_by_citycd = function ( chain, citycd ) {
 	var idx = 'citylist';
@@ -346,7 +349,7 @@ JsonpZip.master.get_city_by_citycd = function ( chain, citycd ) {
 			return chain( pref+city );
 		}
 	};
-	this.start_task( next, idx );
+	this.load_run( next, idx );
 };
 JsonpZip.master.get_citycd_by_addr = function ( chain, addr ) {
 	var idx = 'citylist';
@@ -356,11 +359,11 @@ JsonpZip.master.get_citycd_by_addr = function ( chain, addr ) {
 			var pref = data[i][1];
 			if ( pref != addr.substr( 0, pref.length )) continue;
 			var rest = addr.substr( pref.length );
-			var array = __this.grep_first( data[i][2], 1, rest );
+			var array = __this.match_first( data[i][2], 1, rest );
 			if ( array ) return chain( array[0] );
 		}
 	};
-	this.start_task( next, idx );
+	this.load_run( next, idx );
 };
 
 /* ********************************************************* */
@@ -400,46 +403,74 @@ JsonpZip.zip2addr.get_addr_by_zipcd = function ( chain, zip7 ) {
 JsonpZip.zip2addr.get_addrlist_by_zipcd = function ( chain, zip7 ) {
 	var __this = this;
 	var next = function ( data ) {
-		var array = __this.grep_multiple( data, 0, zip7 );
-		if ( ! array ) return;
-		var map = __this.map_title( array, ['zip7','pref','city','area','strt'] );
-		return chain( map );
+		for( var i=0; i<data.length; i++ ) {
+			var array = __this.grep_multiple( data[i][3], 0, zip7 );
+			if ( ! array ) continue;
+			if ( ! array.length ) continue;
+			var citycd = data[i][0];
+			var pref = data[i][1];
+			var city = data[i][2];
+			var map = __this.map_title( array, ['zip7','area','strt'] );
+			for( var i=0; i<map.length; i++ ) {
+				map[i].citycd = citycd;
+				map[i].pref = pref;
+				map[i].city = city;
+			}
+			return chain( map );
+		}
 	};
-	this.start_task( next, zip7 );
+	this.load_run( next, zip7 );
 };
 
 /* ********************************************************* */
 
 JsonpZip.addr2zip.get_ziplist_by_addr = function ( chain, addr ) {
 	var __this = this;
-	var next = function ( data ) {
-		var array = [];
-		for( var i=0; i<data.length; i++ ) {
-			var prefcity = data[i][0]+data[i][1];
-			if ( prefcity != addr.substr( 0, prefcity.length )) continue;
-			var rest = addr.substr( prefcity.length );
-			var array = __this.match_first( data[i][2], 0, rest );
-			if ( ! array ) return;
-			var ret = array.slice( 1 );
-			return chain( ret );
-		}
+	var next2 = function ( meta ) {
+		var pref = meta[1];
+		var city = meta[2];
+		var rest = addr.substr( pref.length+city.length );
+		// 配列中の大字町域名の方が短い。テスト用住所の方が長い
+		var array = __this.match_first( meta[3], 0, rest );
+		if ( ! array ) return;
+		// 大字町域名は無視して、郵便番号以降を取り出す
+		var ret = array.slice( 1 );
+		return chain( ret );
 	};
-	this.start_task( next, addr );
+	var next1 = function ( citycd ) {
+		__this.get_citymeta_by_citycd( next2, citycd );
+	};
+	JsonpZip.master.get_citycd_by_addr( next1, addr );
+
 };
 JsonpZip.addr2zip.get_arealist_by_addr = function ( chain, addr ) {
 	var __this = this;
+	var next2 = function ( meta ) {
+		// 市区町村名以外は無視する（前方絞り込みする？）
+		var pref = meta[1];
+		var city = meta[2];
+		var rest = addr.substr( pref.length+city.length );
+		// 郵便番号は無視して、大字町域名のみを取り出す
+		var array = meta[3];
+		var list = [];
+		for( var i=0; i<array.length; i++ ) {
+			list.push( array[i][0] );
+		}
+		return chain( list );
+	};
+	var next1 = function ( citycd ) {
+		__this.get_citymeta_by_citycd( next2, citycd );
+	};
+	JsonpZip.master.get_citycd_by_addr( next1, addr );
+};
+JsonpZip.addr2zip.get_citymeta_by_citycd = function ( chain, citycd ) {
 	var next = function ( data ) {
 		for( var i=0; i<data.length; i++ ) {
-			var prefcity = data[i][0]+data[i][1];
-			if ( prefcity != addr.substr( 0, prefcity.length )) continue;
-			var list = [];
-			for( var j=0; j<data[i][2].length; j++ ) {
-				list.push( data[i][2][j][0] );
-			}
-			return chain( list );
+			if ( citycd != data[i][0] ) continue;
+			return chain( data[i] );
 		}
 	};
-	this.start_task( next, addr );
+	this.load_run( next, citycd );
 };
 
 /* ********************************************************* */
@@ -598,7 +629,7 @@ JsonpZip.form.prototype.init_arealist = function ( chain ) {
 	var addr = this.input.city.get_value();
 	if ( ! addr ) return next( [] );
 	if ( this.input.pref ) addr = this.input.pref.get_value() + addr;
-	JsonpZip.master.get_arealist_by_city( next, addr );
+	JsonpZip.addr2zip.get_arealist_by_addr( next, addr );
 }
 
 // 	フォームに入力されている郵便番号を取得
@@ -745,11 +776,11 @@ JsonpZip.form.prototype.onChange = function ( input, chain ) {
 	if ( input.column.substr(0,3) == 'zip' ) {
 		// 更新のあったカラム種別が zip3,zip4,zip7 の場合
 		// 郵便番号　⇒　住所自動入力
-		// 郵便番号が7桁でない場合は無視する
-		if ( zip7.length != 7 ) return;
 		// 最終回と同じ（変更がない）場合は無視する
 		if ( zip7 == this.last_zipenter ) return;
 		this.last_zipenter = zip7;
+		// 郵便番号が7桁でない場合は無視する
+		if ( zip7.length != 7 ) return;
 		// 住所が一部でも手入力されていれば無視する
 		var text = "";
 		if ( this.input.pref && this.input.pref.type_text ) text += this.input.pref.get_value();
@@ -817,12 +848,26 @@ new function () {
 }
 
 /* ********************************************************* */
-/*
-	JsonpZip.master.get_prefcd_by_addr( function(pref) { alert( pref ); }, '東京都' );
-	JsonpZip.master.get_pref_by_prefcd( function(pref) { alert( pref ); }, 13 );
-	JsonpZip.master.get_citycd_by_addr(  function(citycd) { alert( citycd ); }, "北海道空知郡上富良野町" );
-	JsonpZip.master.get_city_by_citycd( function(addr) { alert( addr ); }, "01460" );
-	JsonpZip.addr2zip.get_ziplist_by_addr( function(ret) { alert( ret ); }, "新潟県上越市大潟区潟守新田" );
-	JsonpZip.zip2addr.get_addrlist_by_zipcd( function(ret) { alert(ret[0].area+", "+ret[1].area); }, "0110951" );
-	JsonpZip.master.get_preflist( init_pullpref );
-*/
+
+
+
+	var init = function () {
+		var chain = function ( ret ) { alert( ret ) };
+
+		JsonpZip.master.get_prefcd_by_addr( chain, '東京都' );
+
+	/*
+		JsonpZip.master.get_citycd_by_addr(  chain, "北海道空知郡上富良野町" );
+		JsonpZip.master.get_pref_by_prefcd( chain, 13 );
+		JsonpZip.master.get_city_by_citycd( chain, "01460" );
+		JsonpZip.master.get_citycd_by_addr(  chain, "北海道空知郡上富良野町" );
+		JsonpZip.master.get_preflist( chain );
+		JsonpZip.zip2addr.get_addrlist_by_zipcd( chain, "0110951" );
+		JsonpZip.addr2zip.get_ziplist_by_addr( chain, "新潟県上越市大潟区潟守新田" );
+		JsonpZip.addr2zip.get_ziplist_by_addr( chain, "東京都大田区白金台" );
+		JsonpZip.addr2zip.get_ziplist_by_addr( chain, "東京都大田区白金" );
+		JsonpZip.addr2zip.get_ziplist_by_addr( chain, "東京都大田区仲池上１丁目" );
+	*/
+
+	};
+	setTimeout( init, 1 );
