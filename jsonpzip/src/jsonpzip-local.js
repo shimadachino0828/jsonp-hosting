@@ -1,6 +1,6 @@
 /* ================================================================ *
-    jsonzip-load.js
-    Copyright (c) 2006-2007 Kawasaki Yusuke <u-suke [at] kawa.net>
+    JsonZip
+    Copyright (c) 2006-2008 Kawasaki Yusuke <u-suke [at] kawa.net>
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation
@@ -50,7 +50,7 @@ new function () {
 	var init = function () {
 		var base = findbase( me );
 		if ( typeof(JsonpZip) == 'undefined' ) JsonpZip = {};
-		JsonpZip.JSONP_BASE = base+'../';
+		JsonpZip.JSONP_BASE = base+'../jsonp/';
 		for( var i=0; i<script.length; i++ ) {
 			var src = script[i];
 			if ( ! src.match( /^(https?:\/)?\// ) ) {
@@ -59,5 +59,9 @@ new function () {
 			load( src );
 		}
 	};
-    setTimeout( init, 1 );
+	if ( window.jQuery && jQuery.fn && jQuery.fn.ready ) {
+		jQuery.fn.ready( init );
+	} else {
+		setTimeout( init, 0 );
+	}
 };

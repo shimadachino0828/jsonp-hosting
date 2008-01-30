@@ -1,6 +1,6 @@
 /* ================================================================ *
-    jsonzip-main.js
-    Copyright (c) 2006-2007 Kawasaki Yusuke <u-suke [at] kawa.net>
+    JsonZip
+    Copyright (c) 2006-2008 Kawasaki Yusuke <u-suke [at] kawa.net>
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation
@@ -24,102 +24,16 @@
     OTHER DEALINGS IN THE SOFTWARE.
 * ================================================================ */
 
-JsonpZip = {};
-JsonpZip.URL = 'http://jsonp-hosting.googlecode.com/svn/trunk/jsonpzip/jsonp/';
+if ( typeof(JsonpZip) == 'undefined' ) JsonpZip = {};
+if ( typeof(JsonpZip.JSONP_BASE) == 'undefined' ) {
+	JsonpZip.JSONP_BASE = 'http://jsonp-hosting.googlecode.com/svn/trunk/jsonpzip/jsonp/';
+}
 JsonpZip.VERSION = '0.01';
-JsonpZip.common = function () {};
+JsonpZip.Base = function () { return this; };
 
 /* ********************************************************* */
 
-//	JSONP から呼び出される共通メソッド
-
-JsonpZip.common.prototype.callback = function ( arg ) {
-    if ( ! arg ) return;
-    this.store_cache( arg.index, arg.data );
-    this.check_task();
-};
-
-//	キャッシュにデータを格納する
-
-JsonpZip.common.prototype.store_cache = function ( idx, data ) {
-    if ( ! this._cache ) this._cache = [];
-    this._cache[idx] = data;
-}
-
-//	キャッシュ状況を確認し、キャッシュにあればそれを返す
-
-JsonpZip.common.prototype.check_cache = function ( idx ) {
-    if ( ! this._cache ) this._cache = [];
-    return this._cache[idx];
-}
-
-//	新しい非同期タスク（キャッシュ付）を開始する
-
-JsonpZip.common.prototype.load_run = function ( chain, key ) {
-    var idx = this.index_key( key );
-    var data = this.check_cache( idx );
-    if ( data ) {
-        chain( data );
-    } else {
-        var __this = this;
-        var next = function () {
-            data = __this.check_cache( idx );
-            if ( ! data ) return false;
-            chain( data );
-            return true;
-        };
-        this.queue_task( next );
-        var src = this.jsonp_url( idx );
-        var suffix = this.url_suffix();
-        if ( suffix ) src += suffix;
-        this.load_jsonp( src );
-    }
-}
-
-//	タスクをタスクリストに登録する
-
-JsonpZip.common.prototype.queue_task = function ( chain ) {
-    if ( ! this._tasklist ) this._tasklist = [];
-    this._tasklist.push( chain );
-}
-
-//	各タスクを呼び出し、true が返ればタスク終了、false が返れば後で再確認する
-
-JsonpZip.common.prototype.check_task = function () {
-    if ( ! this._tasklist ) return;
-    if ( ! this._tasklist[0] ) this._tasklist.shift();
-    for( var i=0; i<this._tasklist.length; i++ ) {
-        var next = this._tasklist[i];
-        if ( ! next ) continue;
-        var stat = next();
-        if ( stat ) this._tasklist[i] = null;
-    }
-}
-
-JsonpZip.common.prototype.load_jsonp = function ( src ) {
-    var next = function () {
-        var script = document.createElement( 'script' );
-        script.charset = 'utf-8';
-        script.type = 'text/javascript';
-        script.src = src;
-        document.lastChild.appendChild( script );
-    };
-//  setTimeout( next, 1 );
-	next();
-};
-
-JsonpZip.common.prototype.url_suffix = function () {
-	var suffix = '';
-	suffix += '?v='+JsonpZip.VERSION;
-	return suffix;
-}
-JsonpZip.common.prototype.get_class = function () {
-	return 'common';
-}
-JsonpZip.common.prototype.index_key = function ( idx ) {
-	return idx;
-};
-JsonpZip.common.prototype.list_to_hash = function ( list, kcol, vcol ) {
+JsonpZip.Base.prototype.list_to_hash = function ( list, kcol, vcol ) {
 	var hash = [];
 	for( var i=0; i<list.length; i++ ) {
 		hash[list[i][kcol]] = list[i][vcol];
@@ -130,7 +44,7 @@ JsonpZip.common.prototype.list_to_hash = function ( list, kcol, vcol ) {
 //	配列の特定カラムを完全一致で検索して、マッチした全てのレコードを配列で返す
 //	( grep { $_->[$col] == $test } @list )
 
-JsonpZip.common.prototype.grep_multiple = function ( list, col, test ) {
+JsonpZip.Base.prototype.grep_multiple = function ( list, col, test ) {
 	var out = [];
 	for( var i=0; i<list.length; i++ ) {
 		if ( list[i][col] == test ) {
@@ -142,7 +56,7 @@ JsonpZip.common.prototype.grep_multiple = function ( list, col, test ) {
 //	配列の特定カラムを完全一致で検索して、最初にマッチしたレコードを返す
 //	( grep { $_->[$col] == $test } @list )[0]
 
-JsonpZip.common.prototype.grep_first = function ( list, col, test ) {
+JsonpZip.Base.prototype.grep_first = function ( list, col, test ) {
 	for( var i=0; i<list.length; i++ ) {
 		if ( list[i][col] == test ) return list[i];
 	}
@@ -152,7 +66,7 @@ JsonpZip.common.prototype.grep_first = function ( list, col, test ) {
 //	配列にある文字列の方が短い。チェック用文字列の方が長い。
 //	( grep { $_->[$col] =~ /^$test/ } @list )[0]
 
-JsonpZip.common.prototype.match_first = function ( list, col, test ) {
+JsonpZip.Base.prototype.match_first = function ( list, col, test ) {
 	var ret;
 	var max = -1;
 	for( var i=0; i<list.length; i++ ) {
@@ -169,7 +83,7 @@ JsonpZip.common.prototype.match_first = function ( list, col, test ) {
 
 //	配列の各カラムに名前を振る
 
-JsonpZip.common.prototype.map_title = function ( list, title ) {
+JsonpZip.Base.prototype.map_title = function ( list, title ) {
 	var out = [];
 	for( var i=0; i<list.length; i++ ) {
 		var line = {};
@@ -185,7 +99,7 @@ JsonpZip.common.prototype.map_title = function ( list, title ) {
 
 //	配列の各レコードの特定カラムのみを抽出した配列を返す
 
-JsonpZip.common.prototype.map_column = function ( list, col ) {
+JsonpZip.Base.prototype.map_column = function ( list, col ) {
 	var out = [];
 	for( var i=0; i<list.length; i++ ) {
 		out.push( list[i][col] );
@@ -195,19 +109,11 @@ JsonpZip.common.prototype.map_column = function ( list, col ) {
 
 // 	プルダウンの値を取得する
 
-JsonpZip.common.prototype.get_select_value = function ( elem ) {
-    var opts = elem.options;
-    if ( ! opts ) return;
-    for( var i=0; i<opts.length; i++ ) {
-        if ( opts[i].selected ) return opts[i].value;
-    }
-};
-
-JsonpZip.common.prototype.addEventListener = function ( elem, type, chain ) {
-    if ( window.Event && Event.observe ) {
-        Event.observe( elem, type, chain );
-    } else if ( window.jQuery ) {
+JsonpZip.Base.prototype.addEventListener = function ( elem, type, chain ) {
+    if ( window.jQuery ) {
         jQuery( elem ).bind( type, chain );
+    } else if ( window.Event && Event.observe ) {
+        Event.observe( elem, type, chain );
     } else {
 		var save = elem["on"+type];
 		if ( save ) {
@@ -223,124 +129,223 @@ JsonpZip.common.prototype.addEventListener = function ( elem, type, chain ) {
 
 /* ********************************************************* */
 
-JsonpZip.master = new JsonpZip.common();
-JsonpZip.addr2zip = new JsonpZip.common();
-JsonpZip.zip2addr = new JsonpZip.common();
-JsonpZip.util = new JsonpZip.common();
+JsonpZip.JsonpCache = function () { return this; };
+
+//	JSONP から呼び出される共通コールバック関数
+
+JsonpZip.JsonpCache.prototype.callback = function ( arg ) {
+    if ( ! arg ) return;
+    this.store_cache( arg.index, arg.data );
+    this.check_task();
+};
+
+//	キャッシュにデータを格納する
+
+JsonpZip.JsonpCache.prototype.store_cache = function ( idx, data ) {
+    if ( ! this._cache ) this._cache = [];
+    this._cache[idx] = data;
+}
+
+//	キャッシュ状況を確認し、キャッシュにあればそれを返す
+
+JsonpZip.JsonpCache.prototype.check_cache = function ( idx ) {
+    if ( ! this._cache ) this._cache = [];
+    return this._cache[idx];
+}
+
+//	新しい非同期タスク（キャッシュ付）を開始する
+
+JsonpZip.JsonpCache.prototype.load_run = function ( chain, key ) {
+    var idx = this.index_key( key );
+    var data = this.check_cache( idx );
+    if ( data ) {
+        chain( data );
+    } else {
+        var self = this;
+        var next = function () {
+            data = self.check_cache( idx );
+            if ( ! data ) return false;
+            chain( data );
+            return true;
+        };
+        this.queue_task( next );
+        var src = this.jsonp_url( idx );
+        var suffix = this.url_suffix();
+        if ( suffix ) src += suffix;
+        this.load_jsonp( src );
+    }
+}
+
+//	タスクをタスクリストに登録する
+
+JsonpZip.JsonpCache.prototype.queue_task = function ( chain ) {
+    if ( ! this._tasklist ) this._tasklist = [];
+    this._tasklist.push( chain );
+}
+
+//	各タスクを呼び出し、true が返ればタスク終了、false が返れば後で再確認する
+
+JsonpZip.JsonpCache.prototype.check_task = function () {
+    if ( ! this._tasklist ) return;
+    if ( ! this._tasklist[0] ) this._tasklist.shift();
+    for( var i=0; i<this._tasklist.length; i++ ) {
+        var next = this._tasklist[i];
+        if ( ! next ) continue;
+        var stat = next();
+        if ( stat ) this._tasklist[i] = null;
+    }
+}
+
+JsonpZip.JsonpCache.prototype.load_jsonp = function ( src ) {
+    var next = function () {
+        var script = document.createElement( 'script' );
+        script.charset = 'utf-8';
+        script.type = 'text/javascript';
+        script.src = src;
+        document.lastChild.appendChild( script );
+    };
+//  setTimeout( next, 1 );
+	next();
+};
 
 /* ********************************************************* */
 
-JsonpZip.master.get_class = function () { return 'master'; }
-JsonpZip.addr2zip.get_class = function () { return 'addr2zip'; }
-JsonpZip.zip2addr.get_class = function () { return 'zip2addr'; }
+JsonpZip.Data = function () { return this; };
+JsonpZip.Data.prototype = new JsonpZip.JsonpCache();
+JsonpZip.Data.prototype.base_url = function () {
+	return JsonpZip.JSONP_BASE;
+}
+JsonpZip.Data.prototype.url_suffix = function () {
+	var suffix = '';
+	suffix += '?v='+JsonpZip.VERSION;
+	return suffix;
+}
 
 /* ********************************************************* */
 
-JsonpZip.master.jsonp_url = function ( idx ) {
+JsonpZip.Data.Master = function () { return this; };
+JsonpZip.Data.ByCity = function () { return this; };
+JsonpZip.Data.ByZip  = function () { return this; };
+JsonpZip.Data.Master.prototype = new JsonpZip.Data();
+JsonpZip.Data.ByCity.prototype = new JsonpZip.Data();
+JsonpZip.Data.ByZip.prototype  = new JsonpZip.Data();
+
+JsonpZip.Data.Master.prototype.jsonp_url = function ( idx ) {
 	if ( ! idx ) return;
 	if ( idx == "" ) return;
-	var url = JsonpZip.URL;
+	var url = this.base_url();
 	url += 'master/'+idx+'.jsonp';
 	return url;
 };
-JsonpZip.addr2zip.jsonp_url = function ( citycd ) {
-	var idx = this.index_key( citycd );
-	var prefcd = idx.substr( 0, 2 );
-	if ( ! idx ) return;
-	if ( idx == "" ) return;
-	var url = JsonpZip.URL;
-	url += 'city/pref-'+prefcd+'/city-'+idx+'.jsonp';
-	return url;
-};
-JsonpZip.zip2addr.jsonp_url = function ( zip7 ) {
+JsonpZip.Data.ByZip.prototype.jsonp_url = function ( zip7 ) {
 	var idx = this.index_key( zip7 );
 	if ( ! idx ) return;
 	if ( idx == "" ) return;
-	var url = JsonpZip.URL;
+	var url = this.base_url();
 	url += 'zip/zip-'+idx+'.jsonp';
 	return url;
 };
-
-/* ********************************************************* */
-
-JsonpZip.zip2addr.index_key = function ( zip7 ) {
-	var idx = zip7.substr( 0, 3 );
+JsonpZip.Data.ByCity.prototype.jsonp_url = function ( citycd ) {
+	var idx = this.index_key( citycd );
+	if ( ! idx ) return;
+	if ( idx == "" ) return;
+	var url = this.base_url();
+	var prefcd = idx.substr( 0, 2 ).replace( /[^0-9]+/g, "" );
+	url += 'city/pref-'+prefcd+'/city-'+idx+'.jsonp';
+	return url;
+};
+JsonpZip.Data.Master.prototype.index_key = function ( idx ) {
 	idx = idx.replace( /[^A-Za-z0-9\-\%]+/g, "" );
 	return idx;
 };
-JsonpZip.addr2zip.index_key = function ( citycd ) {
-	var idx = citycd.substr( 0, 5 );
-	idx = idx.replace( /[^A-Za-z0-9\-\%]+/g, "" );
+JsonpZip.Data.ByZip.prototype.index_key = function ( idx ) {
+	idx = idx.replace( /[^0-9]+/g, "" );
+	idx = idx.substr( 0, 3 );
+	return idx;
+};
+JsonpZip.Data.ByCity.prototype.index_key = function ( idx ) {
+	idx = idx.replace( /[^0-9]+/g, "" );
+	idx = idx.substr( 0, 5 );
 	return idx;
 };
 
 /* ********************************************************* */
 
-JsonpZip.master.get_prefcd_by_addr = function ( chain, pref ) {
+JsonpZip.master   = new JsonpZip.Data.Master();
+JsonpZip.addr2zip = new JsonpZip.Data.ByCity();
+JsonpZip.zip2addr = new JsonpZip.Data.ByZip();
+
+/* ********************************************************* */
+
+JsonpZip.Core = function () { return this; };
+JsonpZip.Core.prototype = new JsonpZip.Base();
+
+JsonpZip.Core.prototype.get_prefcd_by_addr = function ( chain, pref ) {
 	if ( this._pref2prefcd ) {
 		var prefcd = this._pref2prefcd[pref];
 		return chain( prefcd );
 	}
 	var idx = 'preflist';
-	var __this = this;
+	var self = this;
 	var next = function ( data ) {
-		__this._pref2prefcd = __this.list_to_hash( data, 1, 0 );;
-		var prefcd = __this._pref2prefcd[pref];
+		self._pref2prefcd = self.list_to_hash( data, 1, 0 );;
+		var prefcd = self._pref2prefcd[pref];
 		return chain( prefcd );
 	};
-	this.load_run( next, idx );
+	JsonpZip.master.load_run( next, idx );
 };
-JsonpZip.master.get_pref_by_prefcd = function ( chain, prefcd ) {
+JsonpZip.Core.prototype.get_pref_by_prefcd = function ( chain, prefcd ) {
+	prefcd -= 0;
 	if ( this._prefcd2pref ) {
 		var pref = this._prefcd2pref[prefcd];
 		return chain( pref );
 	}
 	var idx = 'preflist';
-	var __this = this;
+	var self = this;
 	var next = function ( data ) {
-		__this._prefcd2pref = __this.list_to_hash( data, 0, 1 );;
-		var pref = __this._prefcd2pref[prefcd];
+		self._prefcd2pref = self.list_to_hash( data, 0, 1 );;
+		var pref = self._prefcd2pref[prefcd];
 		return chain( pref );
 	};
-	this.load_run( next, idx );
+	JsonpZip.master.load_run( next, idx );
 };
-JsonpZip.master.get_preflist = function ( chain ) {
+JsonpZip.Core.prototype.get_preflist = function ( chain ) {
 	if ( this._pref_cache ) {
 		var list = this._pref_cache;
 		return chain( list );
 	}
 	var idx = 'preflist';
-	var __this = this;
+	var self = this;
 	var next = function ( data ) {
-		var list = __this.map_title( data, ['prefcd','pref'] );
+		var list = self.map_title( data, ['prefcd','pref'] );
 		this._pref_cache = list;
 		return chain( list );
 	};
-	this.load_run( next, idx );
+	JsonpZip.master.load_run( next, idx );
 };
-JsonpZip.master.get_citylist_by_pref = function ( chain, pref ) {
+JsonpZip.Core.prototype.get_citylist_by_pref = function ( chain, pref ) {
 	if ( ! this._city_cache ) this._city_cache = {};
 	if ( this._city_cache[pref] ) {
 		var list = this._city_cache[pref];
 		return chain( list );
 	}
 	var idx = 'citylist';
-	var __this = this;
+	var self = this;
 	var next = function ( data ) {
-		var array = __this.grep_first( data, 1, pref );
+		var array = self.grep_first( data, 1, pref );
 		if ( ! array ) return;
-		__this._city_cache[pref] = __this.map_title( array[2], ['citycd','city'] );
-		var list = __this._city_cache[pref];
+		self._city_cache[pref] = self.map_title( array[2], ['citycd','city'] );
+		var list = self._city_cache[pref];
 		return chain( list );
 	};
-	this.load_run( next, idx );
+	JsonpZip.master.load_run( next, idx );
 };
-JsonpZip.master.get_city_by_citycd = function ( chain, citycd ) {
+JsonpZip.Core.prototype.get_city_by_citycd = function ( chain, citycd ) {
 	var idx = 'citylist';
-	var __this = this;
+	var self = this;
 	var next = function ( data ) {
 		for( var i=0; i<data.length; i++ ) {
-			var array = __this.grep_first( data[i][2], 0, citycd );
+			var array = self.grep_first( data[i][2], 0, citycd );
 			if ( ! array ) return;
 //			var prefcd = data[i][0];
 			var pref = data[i][1];
@@ -348,26 +353,23 @@ JsonpZip.master.get_city_by_citycd = function ( chain, citycd ) {
 			return chain( pref+city );
 		}
 	};
-	this.load_run( next, idx );
+	JsonpZip.master.load_run( next, idx );
 };
-JsonpZip.master.get_citycd_by_addr = function ( chain, addr ) {
+JsonpZip.Core.prototype.get_citycd_by_addr = function ( chain, addr ) {
 	var idx = 'citylist';
-	var __this = this;
+	var self = this;
 	var next = function ( data ) {
 		for( var i=0; i<data.length; i++ ) {
 			var pref = data[i][1];
 			if ( pref != addr.substr( 0, pref.length )) continue;
 			var rest = addr.substr( pref.length );
-			var array = __this.match_first( data[i][2], 1, rest );
+			var array = self.match_first( data[i][2], 1, rest );
 			if ( array ) return chain( array[0] );
 		}
 	};
-	this.load_run( next, idx );
+	JsonpZip.master.load_run( next, idx );
 };
-
-/* ********************************************************* */
-
-JsonpZip.zip2addr.get_addr_by_zipcd = function ( chain, zip7 ) {
+JsonpZip.Core.prototype.get_addr_by_zipcd = function ( chain, zip7 ) {
 	var next = function ( list ) {
 		if ( ! list ) return;
 		if ( ! list.length ) return;
@@ -399,17 +401,18 @@ JsonpZip.zip2addr.get_addr_by_zipcd = function ( chain, zip7 ) {
 	}
 	this.get_addrlist_by_zipcd( next, zip7 );
 };
-JsonpZip.zip2addr.get_addrlist_by_zipcd = function ( chain, zip7 ) {
-	var __this = this;
+JsonpZip.Core.prototype.get_addrlist_by_zipcd = function ( chain, zip7 ) {
+	var self = this;
+	zip7 = zip7.replace( /[^0-9]+/g, "" );
 	var next = function ( data ) {
 		for( var i=0; i<data.length; i++ ) {
-			var array = __this.grep_multiple( data[i][3], 0, zip7 );
+			var array = self.grep_multiple( data[i][3], 0, zip7 );
 			if ( ! array ) continue;
 			if ( ! array.length ) continue;
 			var citycd = data[i][0];
 			var pref = data[i][1];
 			var city = data[i][2];
-			var map = __this.map_title( array, ['zip7','area','strt'] );
+			var map = self.map_title( array, ['zip7','area','strt'] );
 			for( var i=0; i<map.length; i++ ) {
 				map[i].citycd = citycd;
 				map[i].pref = pref;
@@ -418,32 +421,32 @@ JsonpZip.zip2addr.get_addrlist_by_zipcd = function ( chain, zip7 ) {
 			return chain( map );
 		}
 	};
-	this.load_run( next, zip7 );
+	JsonpZip.zip2addr.load_run( next, zip7 );
 };
 
 /* ********************************************************* */
 
-JsonpZip.addr2zip.get_ziplist_by_addr = function ( chain, addr ) {
-	var __this = this;
+JsonpZip.Core.prototype.get_ziplist_by_addr = function ( chain, addr ) {
+	var self = this;
 	var next2 = function ( meta ) {
 		var pref = meta[1];
 		var city = meta[2];
 		var rest = addr.substr( pref.length+city.length );
 		// 配列中の大字町域名の方が短い。テスト用住所の方が長い
-		var array = __this.match_first( meta[3], 0, rest );
+		var array = self.match_first( meta[3], 0, rest );
 		if ( ! array ) return;
 		// 大字町域名は無視して、郵便番号以降を取り出す
 		var ret = array.slice( 1 );
 		return chain( ret );
 	};
 	var next1 = function ( citycd ) {
-		__this.get_citymeta_by_citycd( next2, citycd );
+		self.get_citymeta_by_citycd( next2, citycd );
 	};
-	JsonpZip.master.get_citycd_by_addr( next1, addr );
+	this.get_citycd_by_addr( next1, addr );
 
 };
-JsonpZip.addr2zip.get_arealist_by_addr = function ( chain, addr ) {
-	var __this = this;
+JsonpZip.Core.prototype.get_arealist_by_addr = function ( chain, addr ) {
+	var self = this;
 	var next2 = function ( meta ) {
 		// 市区町村名以外は無視する（前方絞り込みする？）
 		var pref = meta[1];
@@ -458,23 +461,23 @@ JsonpZip.addr2zip.get_arealist_by_addr = function ( chain, addr ) {
 		return chain( list );
 	};
 	var next1 = function ( citycd ) {
-		__this.get_citymeta_by_citycd( next2, citycd );
+		self.get_citymeta_by_citycd( next2, citycd );
 	};
-	JsonpZip.master.get_citycd_by_addr( next1, addr );
+	this.get_citycd_by_addr( next1, addr );
 };
-JsonpZip.addr2zip.get_citymeta_by_citycd = function ( chain, citycd ) {
+JsonpZip.Core.prototype.get_citymeta_by_citycd = function ( chain, citycd ) {
 	var next = function ( data ) {
 		for( var i=0; i<data.length; i++ ) {
 			if ( citycd != data[i][0] ) continue;
 			return chain( data[i] );
 		}
 	};
-	this.load_run( next, citycd );
+	JsonpZip.addr2zip.load_run( next, citycd );
 };
 
 /* ********************************************************* */
 
-JsonpZip.element = function ( elem, column, onchange ) {
+JsonpZip.Element = function ( elem, column, onchange ) {
 	this.elem = elem;
 	this.column = column;
 	this.onchange = onchange;
@@ -485,23 +488,24 @@ JsonpZip.element = function ( elem, column, onchange ) {
 	} else if ( tag == 'input' ) {
 		this.type_text = true;
 	}
-	var __this = this;
+	var self = this;
 	var func1 = function () {
-		__this.onchange( __this );
+		self.onchange( self );
 	};
-	JsonpZip.util.addEventListener( elem, 'change', func1 );
+	this.addEventListener( elem, 'change', func1 );
 	var maxlen = elem.getAttribute( 'maxlength' );
 	if ( this.type_text && maxlen ) {
 		var func2 = function () {
-			var val = __this.get_value();
+			var val = self.get_value();
 			if ( val.length != maxlen ) return;
-			__this.onchange( __this );
+			self.onchange( self );
 		};
-		JsonpZip.util.addEventListener( elem, 'keyup', func2 );
+		self.addEventListener( elem, 'keyup', func2 );
 	};
 	return this;
 };
-JsonpZip.element.prototype.init_options = function ( listtxt, listval ) {
+JsonpZip.Element.prototype = new JsonpZip.Base();
+JsonpZip.Element.prototype.init_options = function ( listtxt, listval ) {
     var opts = this.elem.options;
     for( var i=opts.length; i>=this.default_length; i-- ) {
         if ( ! opts[i] ) continue;
@@ -515,18 +519,18 @@ JsonpZip.element.prototype.init_options = function ( listtxt, listval ) {
 		if ( listval ) o.value = listval[i];
 	}
 };
-JsonpZip.element.prototype.set_value = function ( val ) {
+JsonpZip.Element.prototype.set_value = function ( val ) {
 	if ( this.type_select ) return this.set_select_value( val );
 	if ( this.type_text ) {
 		this.elem.value = val;
 //		this.elem.focus();
 	}
 };
-JsonpZip.element.prototype.get_value = function () {
+JsonpZip.Element.prototype.get_value = function () {
 	if ( this.type_select ) return this.get_select_value();
 	if ( this.type_text ) return this.elem.value;
 };
-JsonpZip.element.prototype.set_select_value = function ( val ) {
+JsonpZip.Element.prototype.set_select_value = function ( val ) {
     var opts = this.elem.options;
     if ( ! opts ) return;
     for( var i=0; i<opts.length; i++ ) {
@@ -546,11 +550,11 @@ JsonpZip.element.prototype.set_select_value = function ( val ) {
         }
     }
 };
-JsonpZip.element.prototype.get_select_value = function () {
+JsonpZip.Element.prototype.get_select_value = function () {
 	var opt = this.get_option_selected();
 	if ( opt ) return opt.value;
 };
-JsonpZip.element.prototype.get_option_selected = function () {
+JsonpZip.Element.prototype.get_option_selected = function () {
     var opts = this.elem.options;
     if ( ! opts ) return;
     for( var i=0; i<opts.length; i++ ) {
@@ -560,13 +564,14 @@ JsonpZip.element.prototype.get_option_selected = function () {
 
 /* ********************************************************* */
 
-JsonpZip.form = function ( form ) {
+JsonpZip.Form = function ( form ) {
 	this.form = form;
 	this.input = {};
+	this.jsonpzip = new JsonpZip.Core();
 	var cnt = 0;
-	var __this = this;
+	var self = this;
 	var onchange = function ( input ) {
-		__this.onChange( input );
+		self.onChange( input );
 	};
 	for( var i=0; i<form.elements.length; i++ ) {
 		var elem = form.elements[i];
@@ -578,7 +583,7 @@ JsonpZip.form = function ( form ) {
 		if ( pos1 == 0 && pos2 > 0 ) {
 			pos1 += PREFIX.length;
 			var column = rel.substr( pos1, pos2-pos1 );
-			var input = new JsonpZip.element( elem, column, onchange );
+			var input = new JsonpZip.Element( elem, column, onchange );
 			if ( ! input ) continue;
 			this.input[column] = input;
 			cnt ++;
@@ -590,50 +595,51 @@ JsonpZip.form = function ( form ) {
 	if ( ! cnt ) return;
 	return this;
 };
+JsonpZip.Form.prototype = new JsonpZip.Base();
 
-JsonpZip.form.prototype.init_preflist = function ( chain ) {
+JsonpZip.Form.prototype.init_preflist = function ( chain ) {
 	if ( ! this.input.pref.type_select ) return;
 	if ( this.input.pref.default_length > 1 ) return;
-	var __this = this;
+	var self = this;
 	var next = function ( list ) {
-		var txtlist = JsonpZip.util.map_column( list, 'pref' );
-		__this.input.pref.init_options( txtlist, txtlist );
+		var txtlist = self.map_column( list, 'pref' );
+		self.input.pref.init_options( txtlist, txtlist );
 		if ( chain ) chain();
 	};
-	JsonpZip.master.get_preflist( next );
+	this.jsonpzip.get_preflist( next );
 }
 
-JsonpZip.form.prototype.init_citylist = function ( chain ) {
+JsonpZip.Form.prototype.init_citylist = function ( chain ) {
 	if ( ! this.input.city.type_select ) return;
 	if ( this.input.city.default_length > 1 ) return;
-	var __this = this;
+	var self = this;
 	var next = function ( list ) {
-		var txtlist = JsonpZip.util.map_column( list, 'city' );
-		__this.input.city.init_options( txtlist, txtlist );
+		var txtlist = self.map_column( list, 'city' );
+		self.input.city.init_options( txtlist, txtlist );
 		if ( chain ) chain();
 	};
 	var pref = this.input.pref.get_value();
 	if ( ! pref ) return next( [] );
-	JsonpZip.master.get_citylist_by_pref( next, pref );
+	this.jsonpzip.get_citylist_by_pref( next, pref );
 }
 
-JsonpZip.form.prototype.init_arealist = function ( chain ) {
+JsonpZip.Form.prototype.init_arealist = function ( chain ) {
 	if ( ! this.input.area.type_select ) return;
 	if ( this.input.area.default_length > 1 ) return;
-	var __this = this;
+	var self = this;
 	var next = function ( list ) {
-		__this.input.area.init_options( list, list );
+		self.input.area.init_options( list, list );
 		if ( chain ) chain();
 	};
 	var addr = this.input.city.get_value();
 	if ( ! addr ) return next( [] );
 	if ( this.input.pref ) addr = this.input.pref.get_value() + addr;
-	JsonpZip.addr2zip.get_arealist_by_addr( next, addr );
+	this.jsonpzip.get_arealist_by_addr( next, addr );
 }
 
 // 	フォームに入力されている郵便番号を取得
 
-JsonpZip.form.prototype.read_zipcd = function () {
+JsonpZip.Form.prototype.read_zipcd = function () {
 	var zip7 = "";
 	if ( this.input.zip7 ) {
 		zip7 = this.input.zip7.get_value();
@@ -650,7 +656,7 @@ JsonpZip.form.prototype.read_zipcd = function () {
 
 // 	指定された郵便番号をフォームに入力
 
-JsonpZip.form.prototype.write_zipcd = function ( zip7 ) {
+JsonpZip.Form.prototype.write_zipcd = function ( zip7 ) {
 	var zip3 = zip7.substr( 0, 3 );
 	var zip4 = zip7.substr( 3, 4 );
 	if ( this.input.zip7 ) {
@@ -665,7 +671,7 @@ JsonpZip.form.prototype.write_zipcd = function ( zip7 ) {
 
 // 	フォームに入力されている住所を取得
 
-JsonpZip.form.prototype.read_addr = function () {
+JsonpZip.Form.prototype.read_addr = function () {
 	var addr = "";
 	if ( this.input.pref ) {
 		addr = this.input.pref.get_value();
@@ -682,7 +688,7 @@ JsonpZip.form.prototype.read_addr = function () {
 
 // 	指定された住所オブジェクトから住所フォームを入力
 
-JsonpZip.form.prototype.write_addr = function ( data ) {
+JsonpZip.Form.prototype.write_addr = function ( data ) {
 	if ( this.input.pref ) {
 		this.input.pref.set_value( data.pref );
 	}
@@ -692,18 +698,18 @@ JsonpZip.form.prototype.write_addr = function ( data ) {
 		this.input.addr.set_value( addr );
 //		this.input.addr.elem.focus();
 	} else {
-		var __this = this;
+		var self = this;
 		var next3 = function () {
-			if ( __this.input.strt ) {
-				__this.input.strt.set_value( data.strt );
-//				__this.input.strt.elem.focus();
+			if ( self.input.strt ) {
+				self.input.strt.set_value( data.strt );
+//				self.input.strt.elem.focus();
 			} else {
-//				__this.input.area.elem.focus();
+//				self.input.area.elem.focus();
 			}
 		};
 		var next2 = function () {
-			if ( __this.input.area ) {
-				__this.write_area( data.area, next3 );
+			if ( self.input.area ) {
+				self.write_area( data.area, next3 );
 			}
 		};
 		if ( this.input.city ) {
@@ -712,17 +718,17 @@ JsonpZip.form.prototype.write_addr = function ( data ) {
 	}
 };
 
-JsonpZip.form.prototype.write_strt = function ( strt, chain ) {
+JsonpZip.Form.prototype.write_strt = function ( strt, chain ) {
 	if ( ! this.input.strt ) return;
 	this.input.strt.set_value( strt );
 	if( chain ) chain();
 };
 
-JsonpZip.form.prototype.write_area = function ( area, chain ) {
+JsonpZip.Form.prototype.write_area = function ( area, chain ) {
 	if ( ! this.input.area ) return;
-	var __this = this;
+	var self = this;
 	var next = function () {
-		__this.input.area.set_value( area );
+		self.input.area.set_value( area );
 		if( chain ) chain();
 	};
 	if ( this.input.area.type_select ) {
@@ -732,11 +738,11 @@ JsonpZip.form.prototype.write_area = function ( area, chain ) {
 	}
 };
 
-JsonpZip.form.prototype.write_city = function ( city, chain ) {
+JsonpZip.Form.prototype.write_city = function ( city, chain ) {
 	if ( ! this.input.city ) return;
-	var __this = this;
+	var self = this;
 	var next = function () {
-		__this.input.city.set_value( city );
+		self.input.city.set_value( city );
 		if( chain ) chain();
 	};
 	if ( this.input.city.type_select ) {
@@ -746,22 +752,28 @@ JsonpZip.form.prototype.write_city = function ( city, chain ) {
 	}
 };
 
-JsonpZip.form.prototype.onChange = function ( input, chain ) {
-	var __this = this;
+JsonpZip.Form.prototype.onChange = function ( input, chain ) {
+	var self = this;
+
+	// 都道府県が変更になり、かつ市区町村がプルダウン形式の場合、
+	// 市区町村のプルダウンを更新してから、再度 onChange を呼び直す
 
 	if ( input.column == 'pref' && this.input.city ) {
 		if ( this.input.city.type_select ) {
 			var next5 = function () {
-				__this.onChange( __this.input.city, chain );
+				self.onChange( self.input.city, chain );
 			};
 			return this.init_citylist( next5 );
 		}
 	}
 
+	// 市区町村が変更になり、かつ大字町域がプルダウン形式の場合、
+	// 大字町域のプルダウンを更新してから、再度 onChange を呼び直す
+
 	if ( input.column == 'city' && this.input.area ) {
 		if ( this.input.area.type_select ) {
 			var next4 = function ( list ) {
-				__this.onChange( __this.input.area, chain );
+				self.onChange( self.input.area, chain );
 			};
 			return this.init_arealist( next4 );
 		}
@@ -772,9 +784,10 @@ JsonpZip.form.prototype.onChange = function ( input, chain ) {
 	var addr = this.read_addr();
 	if ( ! addr ) addr = "";
 
+	// 更新のあったカラム種別が zip3,zip4,zip7 の場合
+	// 郵便番号　⇒　住所自動入力
+
 	if ( input.column.substr(0,3) == 'zip' ) {
-		// 更新のあったカラム種別が zip3,zip4,zip7 の場合
-		// 郵便番号　⇒　住所自動入力
 		// 最終回と同じ（変更がない）場合は無視する
 		if ( zip7 == this.last_zipenter ) return;
 		this.last_zipenter = zip7;
@@ -791,12 +804,16 @@ JsonpZip.form.prototype.onChange = function ( input, chain ) {
 		// 住所を取得する
 		var next1 = function ( data ) {
 			var newaddr = data.pref + data.city + data.area + data.strt;
-			__this.write_addr( data );
+			self.write_addr( data );
 			if ( chain ) chain();
 		};
-		JsonpZip.zip2addr.get_addr_by_zipcd( next1, zip7 );
-	} else {
-		// 住所　⇒　郵便番号自動入力モード
+		return this.jsonpzip.get_addr_by_zipcd( next1, zip7 );
+	}
+
+	// 更新のあったカラム種別が zip3,zip4,zip7 以外の場合
+	// 住所　⇒　郵便番号自動入力モード
+
+	else {
 		// 既に郵便番号が入力済かつ、手動で更新されている場合は無視する
 		if ( zip7.length == 7 && zip7 != this.last_zipauto ) return;
 		// 住所が3文字以下（未入力 or 都道府県名のみ）の場合は無視する
@@ -809,61 +826,74 @@ JsonpZip.form.prototype.onChange = function ( input, chain ) {
 		var next2 = function ( list ) {
 			if ( list.length != 1 ) return;
 			var newzip7 = list[0];
-			__this.last_zipauto = newzip7;
-			__this.write_zipcd( newzip7 );
+			self.last_zipauto = newzip7;
+			self.write_zipcd( newzip7 );
 			if ( chain ) chain();
 		};
-		JsonpZip.addr2zip.get_ziplist_by_addr( next2, addr );
+		return this.jsonpzip.get_ziplist_by_addr( next2, addr );
 	}
 };
 
 /* ********************************************************* */
 
-JsonpZip.page = function () {
-	this.form = [];
+JsonpZip.Page = function () {
+//	this.list = [];
+	this.form = {};
 	var list = document.getElementsByTagName( 'form' );
 	for( var i=0; i<list.length; i++ ) {
 		// ページ内のフォームをそれぞれ確認する（複数フォーム対応）
-		var temp = new JsonpZip.form( list[i] );
+		var temp = new JsonpZip.Form( list[i] );
 		if ( ! temp ) return;
-		this.form.push( temp );
-		// 名前付きフォーム <form name="XXXX"> は、JsonpZip.direct.XXXX でアクセス可能
+//		this.list.push( temp );
+		// 名前付きフォーム <form name="XXXX"> は、JsonpZip.page.form.XXXX でアクセス可能
 		if ( list[i].name ) {
-			if ( ! JsonpZip.direct ) JsonpZip.direct = {};
-			JsonpZip.direct[list[i].name] = temp;
+			this.form[list[i].name] = temp;
+		}
+		if ( list[i].id ) {
+			this.form[list[i].id] = temp;
 		}
 	}
-	if ( ! this.form.length ) return;
+//	if ( ! this.list.length ) return;
 	return this;
 };
+JsonpZip.Page.prototype = new JsonpZip.Base();
 
 /* ********************************************************* */
 
 new function () {
-	var init = function () {
-		new JsonpZip.page();
-	};
-	setTimeout( init, 1 );
+    var init = function () {
+        JsonpZip.page = new JsonpZip.Page();
+    };
+	if ( window.jQuery && jQuery.fn && jQuery.fn.ready ) {
+		jQuery.fn.ready( init );
+	} else {
+	    setTimeout( init, 0 );
+	}
 }
 
 /* ********************************************************* */
 
 
 
-	/*
+/* ================================================================ *
 	var init = function () {
 		var chain = function ( ret ) { alert( ret ) };
-		JsonpZip.master.get_prefcd_by_addr( chain, '東京都' );
-		JsonpZip.master.get_citycd_by_addr(  chain, "北海道空知郡上富良野町" );
-		JsonpZip.master.get_pref_by_prefcd( chain, 13 );
-		JsonpZip.master.get_city_by_citycd( chain, "01460" );
-		JsonpZip.master.get_citycd_by_addr(  chain, "北海道空知郡上富良野町" );
-		JsonpZip.master.get_preflist( chain );
-		JsonpZip.zip2addr.get_addrlist_by_zipcd( chain, "0110951" );
-		JsonpZip.addr2zip.get_ziplist_by_addr( chain, "新潟県上越市大潟区潟守新田" );
-		JsonpZip.addr2zip.get_ziplist_by_addr( chain, "東京都大田区白金台" );
-		JsonpZip.addr2zip.get_ziplist_by_addr( chain, "東京都大田区白金" );
-		JsonpZip.addr2zip.get_ziplist_by_addr( chain, "東京都大田区仲池上１丁目" );
+		var jzip = new JsonpZip.Core();
+		jzip.get_prefcd_by_addr( chain, '東京都' );
+		jzip.get_citycd_by_addr(  chain, "北海道空知郡上富良野町" );
+		jzip.get_city_by_citycd( chain, "01460" );
+		jzip.get_pref_by_prefcd( chain, 13 );
+		jzip.get_preflist( chain );
+		jzip.get_addrlist_by_zipcd( chain, "0110951" );
+		jzip.get_addr_by_zipcd( chain, "104-8001" );
+		jzip.get_ziplist_by_addr( chain, "東京都大田区仲池上" );
+		jzip.get_arealist_by_addr( chain, "東京都大田区" );
+		jzip.get_citylist_by_pref( chain, "東京都" );
+		jzip.get_citymeta_by_citycd( chain, "01101" );
 	};
 	setTimeout( init, 1 );
-	*/
+* ================================================================ */
+JsonpZip.master.callback({index:'preflist',ver:'1.1',data:
+[[1,"北海道"],[2,"青森県"],[3,"岩手県"],[4,"宮城県"],[5,"秋田県"],[6,"山形県"],[7,"福島県"],[8,"茨城県"],[9,"栃木県"],[10,"群馬県"],[11,"埼玉県"],[12,"千葉県"],[13,"東京都"],[14,"神奈川県"],[15,"新潟県"],[16,"富山県"],[17,"石川県"],[18,"福井県"],[19,"山梨県"],[20,"長野県"],[21,"岐阜県"],[22,"静岡県"],[23,"愛知県"],[24,"三重県"],[25,"滋賀県"],[26,"京都府"],[27,"大阪府"],[28,"兵庫県"],[29,"奈良県"],[30,"和歌山県"],[31,"鳥取県"],[32,"島根県"],[33,"岡山県"],[34,"広島県"],[35,"山口県"],[36,"徳島県"],[37,"香川県"],[38,"愛媛県"],[39,"高知県"],[40,"福岡県"],[41,"佐賀県"],[42,"長崎県"],[43,"熊本県"],[44,"大分県"],[45,"宮崎県"],[46,"鹿児島県"],[47,"沖縄県"]]
+});
+
