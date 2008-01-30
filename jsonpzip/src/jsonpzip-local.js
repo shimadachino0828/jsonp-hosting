@@ -25,7 +25,7 @@
 * ================================================================ */
 
 new function () {
-	var me = 'jsonpzip-load.js';
+	var me = 'jsonpzip-local.js';
 	var script = [
 		 '../src/jsonpzip-main.js'
 //		,'../jsonp/master/preflist.jsonp'
