@@ -28,8 +28,7 @@ new function () {
 	var me = 'jsonpzip-local.js';
 	var script = [
 		 '../src/jsonpzip-main.js'
-//		,'../jsonp/master/preflist.jsonp'
-//		,'../jsonp/master/citylist.jsonp'
+		,'../src/jsonpzip-init.js'
 	];
 	var findbase = function ( src ) {
 	    var list = document.getElementsByTagName( 'script' );
